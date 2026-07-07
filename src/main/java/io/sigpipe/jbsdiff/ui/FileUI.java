@@ -26,10 +26,10 @@ software, even if advised of the possibility of such damage.
 package io.sigpipe.jbsdiff.ui;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
@@ -57,15 +57,8 @@ public class FileUI {
     public static void diff(File oldFile, File newFile, File patchFile,
                             String compression)
     throws CompressorException, InvalidHeaderException, IOException {
-        FileInputStream oldIn = new FileInputStream(oldFile);
-        byte[] oldBytes = new byte[(int) oldFile.length()];
-        oldIn.read(oldBytes);
-        oldIn.close();
-
-        FileInputStream newIn = new FileInputStream(newFile);
-        byte[] newBytes = new byte[(int) newFile.length()];
-        newIn.read(newBytes);
-        newIn.close();
+        byte[] oldBytes = Files.readAllBytes(oldFile.toPath());
+        byte[] newBytes = Files.readAllBytes(newFile.toPath());
 
         FileOutputStream out = new FileOutputStream(patchFile);
         DiffSettings settings = new DefaultDiffSettings(compression);
