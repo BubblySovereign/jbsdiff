@@ -37,6 +37,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 
 /**
  * This class provides functionality for using an old file and a patch to
@@ -95,7 +96,7 @@ public class Patch {
                 ControlBlock control = new ControlBlock(controlIn);
 
                 /* Read diff string */
-                read(dataIn, output, newPointer, control.getDiffLength());
+                readFully(dataIn, output, newPointer, control.getDiffLength());
 
                 /* Add old data to diff string */
                 for (int i = 0; i < control.getDiffLength(); ++i) {
@@ -108,7 +109,7 @@ public class Patch {
                 oldPointer += control.getDiffLength();
 
                 /* Copy the extra string to the output */
-                read(extraIn, output, newPointer, control.getExtraLength());
+                readFully(extraIn, output, newPointer, control.getExtraLength());
 
                 newPointer += control.getExtraLength();
                 oldPointer += control.getSeekLength();
@@ -138,9 +139,9 @@ public class Patch {
 
         try {
             /* Seek to the correct offsets in each stream */
-            controlIn.skip(Header.HEADER_SIZE);
-            dataIn.skip(Header.HEADER_SIZE + header.getControlLength());
-            extraIn.skip(Header.HEADER_SIZE + header.getControlLength() +
+            skipFully(controlIn, Header.HEADER_SIZE);
+            skipFully(dataIn, Header.HEADER_SIZE + header.getControlLength());
+            skipFully(extraIn, Header.HEADER_SIZE + header.getControlLength() +
                     header.getDiffLength());
 
             /* Set up compressed streams */
@@ -149,10 +150,7 @@ public class Patch {
             dataIn = compressor.createCompressorInputStream(dataIn);
             extraIn = compressor.createCompressorInputStream(extraIn);
 
-            FileInputStream oldStream = new FileInputStream(oldFile);
-            byte[] old = new byte[(int) oldFile.length()];
-            oldStream.read(old);
-            oldStream.close();
+            byte[] old = Files.readAllBytes(oldFile.toPath());
 
             OutputStream out = new BufferedOutputStream(new FileOutputStream(newFile));
 
@@ -167,7 +165,7 @@ public class Patch {
                 int diffLength = control.getDiffLength();
                 int extraLength = control.getExtraLength();
                 byte[] output = new byte[diffLength + extraLength];
-                read(dataIn, output, 0, diffLength);
+                readFully(dataIn, output, 0, diffLength);
 
                 /* Add old data to diff string */
                 for (int i = 0; i < diffLength; ++i) {
@@ -180,7 +178,7 @@ public class Patch {
                 oldPointer += diffLength;
 
                 /* Copy the extra string to the output */
-                read(extraIn, output, diffLength, extraLength);
+                readFully(extraIn, output, diffLength, extraLength);
                 out.write(output);
 
                 newPointer += extraLength;
@@ -197,29 +195,51 @@ public class Patch {
     }
 
     /**
-     * Reads data from an InputStream, and throws an {@link IOException} if
-     * fewer bytes were read than requested.  Since the lengths of data in a
-     * bsdiff patch are explicitly encoded in the control blocks, reading less
-     * than expected is an unrecoverable error.
+     * Skips {@code n} bytes in an {@link InputStream}, retrying if not all the
+     * bytes were skipped yet.
+     *
+     * @param in InputStream to read from
+     * @param n  length of the skip
+     *
+     * @throws IOException when the skip could not be completed
+     */
+    private static void skipFully(InputStream in, long n) throws IOException {
+        while (n > 0) {
+            long skipped = in.skip(n);
+            if (skipped <= 0) {
+                throw new IOException("Failed to skip bytes in patch stream.");
+            }
+            n -= skipped;
+        }
+    }
+
+    /**
+     * Reads {@code len} bytes from an {@link InputStream} into {@code dest},
+     * retrying on partial reads.  Since the lengths of data in a bsdiff patch
+     * are explicitly encoded in the control blocks, hitting EOF before {@code
+     * len} bytes is an unrecoverable error.
      *
      * @param in   InputStream to read from
      * @param dest byte array to read data into
      * @param off  offset in dest to write data at
-     * @param len  length of the read
+     * @param len  number of bytes to read
      *
-     * @throws IOException when fewer bytes were read than requested
+     * @throws IOException when EOF is reached before {@code len} bytes are read
      */
-    private static void read(InputStream in, byte[] dest, int off, int len)
+    private static void readFully(InputStream in, byte[] dest, int off, int len)
             throws IOException {
         if (len == 0) {
-            /* We don't need to do anything */
             return;
         }
 
-        int read = in.read(dest, off, len);
-        if (read < len) {
-            throw new IOException("Corrupt patch; bytes expected = " + len +
-                    " bytes read = " + read);
+        int totalRead = 0;
+        while (totalRead < len) {
+            int n = in.read(dest, off + totalRead, len - totalRead);
+            if (n == -1) {
+                throw new IOException("Corrupt patch; bytes expected = " + len +
+                        " bytes read = " + totalRead);
+            }
+            totalRead += n;
         }
     }
 }
