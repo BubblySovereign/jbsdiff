@@ -99,42 +99,27 @@ class Offset {
      *
      * @throws IOException if an I/O error occurs.
      */
-    public static void writeOffset(int value, OutputStream out)
-            throws IOException {
-        byte[] buf = new byte[OFFSET_SIZE];
-        int y = 0;
+public static void writeOffset(int value, OutputStream out)
+        throws IOException {
+    byte[] buf = new byte[OFFSET_SIZE];
 
-        if (value < 0) {
-            y = -value;
-            /* Set the sign bit */
-            buf[7] |= 0x80;
-        } else {
-            y = value;
-        }
+    // Use long to safely handle Integer.MIN_VALUE.
+    long y = value;
 
-        buf[0] |= y % 256;
-        y -= buf[0] & 0xFF;
-        y /= 256;
-        buf[1] |= y % 256;
-        y -= buf[1] & 0xFF;
-        y /= 256;
-        buf[2] |= y % 256;
-        y -= buf[2] & 0xFF;
-        y /= 256;
-        buf[3] |= y % 256;
-        y -= buf[3] & 0xFF;
-        y /= 256;
-        buf[4] |= y % 256;
-        y -= buf[4] & 0xFF;
-        y /= 256;
-        buf[5] |= y % 256;
-        y -= buf[5] & 0xFF;
-        y /= 256;
-        buf[6] |= y % 256;
-        y -= buf[6] & 0xFF;
-        y /= 256;
-        buf[7] |= y % 256;
-
-        out.write(buf);
+    if (y < 0) {
+        y = -y;
+        buf[7] = (byte) 0x80;
     }
+
+    for (int i = 0; i < OFFSET_SIZE; i++) {
+        buf[i] = (byte) (y & 0xFF);
+        y >>>= 8;
+    }
+
+    // Restore the sign bit after encoding the magnitude.
+    if (value < 0) {
+        buf[7] |= (byte) 0x80;
+    }
+
+    out.write(buf);
 }
