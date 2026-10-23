@@ -192,10 +192,12 @@ public class Diff {
                     lenb -= lens;
                 }
 
-                for (int i = 0; i < lenf; i++) {
-                    db[dblen + i] |= (newBytes[lastScan + i] -
-                            oldBytes[lastPos + i]);
-                }
+for (int i = 0; i < lenf; i++) {
+    db[dblen + i] = (byte) (
+            db[dblen + i]
+            | (newBytes[lastScan + i] - oldBytes[lastPos + i])
+    );
+}
 
                 for (int i = 0; i < (scan - lenb) - (lastScan + lenf); i++) {
                     eb[eblen + i] = newBytes[lastScan + lenf + i];
