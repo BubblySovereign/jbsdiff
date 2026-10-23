@@ -123,3 +123,4 @@ public static void writeOffset(int value, OutputStream out)
 
     out.write(buf);
 }
+}
