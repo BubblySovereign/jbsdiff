@@ -1,7 +1,3 @@
-Here is the code with the indentation fixed, preserving the original logic and formatting the `for` loop and its contents to match the surrounding Java code.
-
-java
-```
 
 /*
 Copyright (c) 2013, Colorado State University
